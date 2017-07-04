@@ -5,8 +5,9 @@ import numpy as np
 
 def add_data_args(parser):
     data = parser.add_argument_group('Data', 'the input images')
-    #data.add_argument('--data-train', type=str, help='the training data')
-    #data.add_argument('--data-val', type=str, help='the validation data')
+    data.add_argument('--data-root', type=str, help='image path root')
+    data.add_argument('--data-train', type=str, help='the training data')
+    data.add_argument('--data-val', type=str, help='the validation data')
     data.add_argument('--rgb-mean', type=str, default='123.68,116.779,103.939',
                       help='a tuple of size 3 for the mean rgb')
     data.add_argument('--pad-size', type=int, default=0,
@@ -108,11 +109,12 @@ def get_rec_iter(args, kv=None):
     rgb_mean = [float(i) for i in args.rgb_mean.split(',')]
     train = mx.img.ImageIter(
         label_width         = 1,
-	path_root	    = 'data/', 
-        #path_imglist         = args.data_train,
-		path_imgrec      = 'data/train.rec',
-		path_imgidx     = 'data/train.idx',
+	path_root	    = '%s/' % args.data_root, 
+        #path_imglist         = '%s.lst' % args.data_train,
+		path_imgrec      = '%s.rec' % args.data_train,
+		path_imgidx     = '%s.idx' % args.data_train,
         data_shape          = (3, 320, 320),
+        resize              = 360,
         batch_size          = args.batch_size,
         rand_crop           = True,
         rand_resize         = True,
@@ -128,10 +130,10 @@ def get_rec_iter(args, kv=None):
     #    return (train, None)
     val = mx.img.ImageIter(
         label_width         = 1,
-	path_root	    = 'data/', 
-        #path_imglist         = args.data_val,
-		path_imgrec      = 'data/val.rec',
-		path_imgidx     = 'data/val.idx',
+	path_root	    = '%s/' % args.data_root, 
+        #path_imglist         = '%s.lst' % args.data_val,
+		path_imgrec      = '%s.rec' % args.data_val,
+		path_imgidx     = '%s.idx' % args.data_val,
         batch_size          = args.batch_size,
         data_shape          =  (3, 320, 320),
         resize		    = 360, 

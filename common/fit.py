@@ -9,7 +9,7 @@ def _get_lr_scheduler(args, kv):
     epoch_size = args.num_examples / args.batch_size
     if 'dist' in args.kv_store:
         epoch_size /= kv.num_workers
-    begin_epoch = args.load_epoch if args.load_epoch else 0
+    begin_epoch = args.begin_epoch#args.load_epoch if args.load_epoch else 0
     step_epochs = [int(l) for l in args.lr_step_epochs.split(',')]
     lr = args.lr
     for s in step_epochs:
@@ -78,15 +78,15 @@ def add_fit_args(parser):
                        help='model prefix')
     parser.add_argument('--monitor', dest='monitor', type=int, default=0,
                         help='log network parameters every N iters if larger than 0')
-    train.add_argument('--load-epoch', type=int,
-                       help='load the model on an epoch using the model-load-prefix')
     train.add_argument('--top-k', type=int, default=5,
                        help='report the top-k accuracy. 0 means no report.')
     train.add_argument('--test-io', type=int, default=0,
                        help='1 means test reading speed without training')
+    train.add_argument('--begin-epoch', type=int, default=0,
+                        help='begin epoch')
     return train
 
-def fit(args, network, data_loader, **kwargs):
+def fit(args, network, data_loader, optimizer=None, **kwargs):
     """
     train a model
     args : argparse returns
@@ -98,7 +98,9 @@ def fit(args, network, data_loader, **kwargs):
 
     # logging
     head = '%(asctime)-15s Node[' + str(kv.rank) + '] %(message)s'
-    logging.basicConfig(level=logging.DEBUG, format=head)
+    logging.basicConfig(
+        filename='log/%s.log' % args.model_prefix[args.model_prefix.find('/') + 1:],
+        level=logging.DEBUG, format=head)
     logging.info('start with arguments %s', args)
 
     # data iterators
@@ -142,11 +144,14 @@ def fit(args, network, data_loader, **kwargs):
     )
 
     lr_scheduler  = lr_scheduler
-    optimizer_params = {
+    if optimizer == None:
+        optimizer_params = {
             'learning_rate': lr,
             'momentum' : args.mom,
             'wd' : args.wd,
             'lr_scheduler': lr_scheduler}
+    else:
+        optimizer_params = None
 
     monitor = mx.mon.Monitor(args.monitor, pattern=".*") if args.monitor > 0 else None
 
@@ -169,14 +174,15 @@ def fit(args, network, data_loader, **kwargs):
         cbs = kwargs['batch_end_callback']
         batch_end_callbacks += cbs if isinstance(cbs, list) else [cbs]
 
+    print "start training"
     # run
     model.fit(train,
-        begin_epoch        = args.load_epoch if args.load_epoch else 0,
+        begin_epoch        = args.begin_epoch,
         num_epoch          = args.num_epochs,
         eval_data          = val,
         eval_metric        = eval_metrics,
         kvstore            = kv,
-        optimizer          = args.optimizer,
+        optimizer          = args.optimizer if optimizer is None else optimizer,
         optimizer_params   = optimizer_params,
         initializer        = initializer,
         arg_params         = arg_params,
